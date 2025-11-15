@@ -107,11 +107,11 @@ def daily_scheduler():
     already_sent = False
     while True:
         now = datetime.now()
-        if now.hour == 9 and now.minute == 0:
+        if now.hour == 8 and now.minute == 0:
             if not already_sent:
                 send_daily_report()
                 already_sent = True
-        elif now.hour != 9:
+        elif now.hour != 8:
             already_sent = False
 
         time.sleep(30)
