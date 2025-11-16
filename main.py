@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 import time
 import requests
@@ -8,26 +9,38 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 import threading
 from datetime import datetime
+import pytz
 
-# ================= LOGGING ================= #
+# ============================================================
+# ANTI-DUPLICATE INSTANCE FIX  (MUY IMPORTANTE EN RENDER)
+# ============================================================
+
+if os.path.exists(".botlock"):
+    print("⚠️ Instancia duplicada detectada. Saliendo para evitar conflicto 409.")
+    sys.exit()
+
+open(".botlock", "w").close()
+
+
+# ============================================================
+# LOGGING
+# ============================================================
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ================= FLASK APP ================= #
+
+# ============================================================
+# FLASK APP
+# ============================================================
 
 app = Flask(__name__)
 
-
-
-
-
 @app.route('/health')
 def health():
-    return {'status': 'oki', 'message': 'Bot is running'}, 200
-
+    return {'status': 'ok', 'message': 'Bot is running'}, 200
 
 @app.route('/')
 def home():
@@ -37,8 +50,9 @@ def home():
     }, 200
 
 
-# ================= TELEGRAM SEND ================= #
-
+# ============================================================
+# TELEGRAM SEND
+# ============================================================
 
 def send_telegram_message(msg):
     try:
@@ -49,8 +63,9 @@ def send_telegram_message(msg):
         logger.error(f"Error enviando mensaje: {e}")
 
 
-# ================= FEAR & GREED API ================= #
-
+# ============================================================
+# FEAR & GREED API
+# ============================================================
 
 def get_fear_greed():
     try:
@@ -64,8 +79,11 @@ def get_fear_greed():
         return None, None
 
 
-# ================= DAILY REPORT ================= #
+# ============================================================
+# DAILY REPORT (09:00 EUROPA/MADRID)
+# ============================================================
 
+MADRID_TZ = pytz.timezone("Europe/Madrid")
 
 def send_daily_report():
     value, classification = get_fear_greed()
@@ -95,38 +113,43 @@ def send_daily_report():
         f"🌡️ *Índice:* {value}/100\n"
         f"📍 *Sentimiento:* {classification}\n\n"
         f"_Y ahora la dedicatoria del día..._\n\n"
-        f"*Papá te quiero* ❤️")
+        f"*Papá te quiero* ❤️"
+    )
 
     send_telegram_message(mensaje)
 
 
-# ================= DAILY SCHEDULER ================= #
-
+# ============================================================
+# DAILY SCHEDULER  → NOW WITH MADRID TIME
+# ============================================================
 
 def daily_scheduler():
     already_sent = False
     while True:
-        now = datetime.now()
-        if now.hour == 8 and now.minute == 0:
+        now = datetime.now(MADRID_TZ)
+
+        if now.hour == 9 and now.minute == 0:
             if not already_sent:
                 send_daily_report()
                 already_sent = True
-        elif now.hour != 8:
+
+        elif now.hour != 9:
             already_sent = False
 
-        time.sleep(30)
+        time.sleep(20)
 
 
-# ================= BOT COMMANDS ================= #
-
+# ============================================================
+# COMMANDS
+# ============================================================
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🤖 *Bot Fear & Greed activo*\n\n"
-        "Te aviso cuando:\n\n"
+        "Te aviso cuando:\n"
         "• Índice > 75 → Codicia extrema\n"
         "• Índice < 25 → Miedo extremo\n"
-        "• Todos los días a las 09:00 → Informe diario\n\n"
+        "• Todos los días a las 09:00 (Madrid) → Informe diario\n\n"
         "Comandos:\n"
         "/check → Ver índice actual\n"
         "/status → Estado del bot",
@@ -148,8 +171,9 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Bot funcionando correctamente.")
 
 
-# ================= THREADS & BOOT ================= #
-
+# ============================================================
+# THREADS & BOOT
+# ============================================================
 
 def run_flask():
     serve(app, host='0.0.0.0', port=5000)
@@ -157,16 +181,26 @@ def run_flask():
 
 def run_bot():
     global BOT_TOKEN, CHAT_ID
-    global BOT_TOKEN, CHAT_ID
+
     BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
     CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+
+    if not BOT_TOKEN or not CHAT_ID:
+        print("❌ ERROR: TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no configurados en Render.")
+        sys.exit()
 
     app_bot = Application.builder().token(BOT_TOKEN).build()
     app_bot.add_handler(CommandHandler("start", start_command))
     app_bot.add_handler(CommandHandler("check", check_command))
     app_bot.add_handler(CommandHandler("status", status_command))
+
+    print("Bot polling iniciado...")
     app_bot.run_polling()
 
+
+# ============================================================
+# START
+# ============================================================
 
 if __name__ == '__main__':
     flask_thread = threading.Thread(target=run_flask, daemon=True)
