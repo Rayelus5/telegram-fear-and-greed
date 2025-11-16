@@ -185,6 +185,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• Índice < 25 → Miedo extremo\n"
         "• Todos los días a las 09:00 (Madrid) → Informe diario\n\n"
         "Comandos:\n"
+        "/top25 → Ver ranking crypto\n"
         "/check → Ver índice actual\n"
         "/status → Estado del bot",
         parse_mode="Markdown")
