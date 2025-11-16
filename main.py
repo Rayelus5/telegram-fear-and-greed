@@ -120,6 +120,40 @@ def send_daily_report():
 
 
 # ============================================================
+# TOP 25 CRYPTO (CoinGecko API)
+# ============================================================
+
+def get_top25_crypto():
+    try:
+        url = (
+            "https://api.coingecko.com/api/v3/coins/markets"
+            "?vs_currency=usd&order=market_cap_desc&per_page=25&page=1&sparkline=false"
+        )
+        response = requests.get(url, timeout=10)
+        data = response.json()
+
+        top_list = []
+        for coin in data:
+            rank = coin.get("market_cap_rank")
+            name = coin.get("name")
+            price = coin.get("current_price")
+            market_cap = coin.get("market_cap")
+
+            top_list.append(
+                f"*#{rank}* — *{name}*\n"
+                f"💵 Precio: `${price:,.2f}`\n"
+                f"🏦 Market Cap: `${market_cap:,.0f}`\n"
+            )
+
+        return "\n".join(top_list)
+
+    except Exception as e:
+        logger.error(f"Error obteniendo top 25 crypto: {e}")
+        return "❌ Error obteniendo datos del Top 25."
+
+
+
+# ============================================================
 # DAILY SCHEDULER  → NOW WITH MADRID TIME
 # ============================================================
 
@@ -171,6 +205,17 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Bot funcionando correctamente.")
 
 
+async def top25_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⏳ Obteniendo top 25 criptomonedas...")
+
+    lista = get_top25_crypto()
+
+    await update.message.reply_text(
+        f"📊 *TOP 25 CRIPTOS POR CAPITALIZACIÓN*\n\n{lista}",
+        parse_mode="Markdown"
+    )
+
+
 # ============================================================
 # THREADS & BOOT
 # ============================================================
@@ -193,6 +238,7 @@ def run_bot():
     app_bot.add_handler(CommandHandler("start", start_command))
     app_bot.add_handler(CommandHandler("check", check_command))
     app_bot.add_handler(CommandHandler("status", status_command))
+    app_bot.add_handler(CommandHandler("top25", top25_command))
 
     print("Bot polling iniciado...")
     app_bot.run_polling()
